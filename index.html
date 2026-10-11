@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Catch the No</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Itim&family=Mali:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: one dark chalkboard screen. Editable question on top, Yes below it, No runs loose on top of everything. */
+  :root {
+    --bg: #131615;
+    --chalk: #ebe7da;
+    --chalk-dim: #8d9490;
+    --line: #3a403d;
+    --yes: #ff7a8a;
+    --yes-ink: #2a0e14;
+    --sweat: #8fd3ff;
+    --font-display: "Itim", "Mali", "Comic Sans MS", cursive;
+    --font-note: "Mali", "Itim", "Comic Sans MS", cursive;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    padding-inline: 16px;
+    background: var(--bg);
+    color: var(--chalk);
+    font-family: var(--font-display);
+    overflow: hidden;
+  }
+  #stage {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(36px, 9vh, 80px);
+    position: relative;
+  }
+  .q-wrap { width: min(100%, 22em); display: flex; flex-direction: column; align-items: center; gap: 10px; position: relative; z-index: 5; }
+  #q {
+    width: 100%;
+    box-sizing: border-box;
+    background: transparent;
+    color: var(--chalk);
+    border: 0;
+    border-bottom: 2px dashed var(--line);
+    border-radius: 0;
+    padding: 4px 4px 10px;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 7.5vw, 3.75rem);
+    line-height: 1.15;
+    text-align: center;
+    text-wrap: balance;
+    resize: none;
+    overflow: hidden;
+    outline: none;
+    transition: border-color .2s;
+  }
+  #q:hover { border-bottom-color: var(--chalk-dim); }
+  #q:focus-visible { border-bottom: 2px solid var(--yes); }
+  #q::placeholder { color: var(--chalk-dim); }
+  .hint { margin: 0; font-family: var(--font-note); font-size: .85rem; color: var(--chalk-dim); }
+
+  .answers { display: flex; align-items: center; justify-content: center; gap: 36px; position: relative; z-index: 10; }
+  .slot { display: block; width: 96px; height: 56px; }
+
+  .yes {
+    font-family: var(--font-display);
+    font-size: 1.9rem;
+    color: var(--yes-ink);
+    background: var(--yes);
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 42px;
+    cursor: pointer;
+    transform-origin: center;
+    transition: transform .45s cubic-bezier(.34, 1.56, .64, 1);
+    box-shadow: 0 0 0 0 rgba(255, 122, 138, .5);
+    animation: glow 2.2s ease-out infinite;
+  }
+  .yes:focus-visible { outline: 3px solid var(--chalk); outline-offset: 4px; }
+  @keyframes glow { 0% { box-shadow: 0 0 0 0 rgba(255,122,138,.45); } 70%, 100% { box-shadow: 0 0 0 22px rgba(255,122,138,0); } }
+
+  .no {
+    position: fixed;
+    left: 0; top: 0;
+    z-index: 20;
+    margin: 0; padding: 0;
+    background: none; border: 0;
+    font-family: var(--font-display);
+    color: var(--chalk);
+    cursor: pointer;
+    --lean: 0deg;
+  }
+  .no:focus-visible { outline: none; }
+  .no:focus-visible .no-pill { outline: 3px solid var(--yes); outline-offset: 4px; }
+  .no-body { position: relative; display: inline-block; transform: rotate(var(--lean)); transition: transform .2s; }
+  .no-pill {
+    display: block;
+    box-sizing: border-box;
+    min-width: 96px;
+    padding: 10px 34px;
+    border: 3px solid var(--chalk);
+    border-radius: 999px;
+    background: var(--bg);
+    font-size: 1.6rem;
+    line-height: 1.2;
+    text-align: center;
+  }
+  .leg {
+    position: absolute;
+    top: 100%;
+    width: 8px; height: 16px;
+    margin-top: -2px;
+    background: var(--chalk);
+    border-radius: 4px;
+    transform-origin: 50% 0;
+  }
+  .leg::after {
+    content: "";
+    position: absolute;
+    bottom: -3px; left: -3px;
+    width: 15px; height: 8px;
+    background: var(--chalk);
+    border-radius: 8px 8px 3px 3px;
+  }
+  .leg.l { left: 27px; }
+  .leg.r { right: 27px; }
+  .sweat {
+    position: absolute;
+    top: -10px; right: -4px;
+    width: 8px; height: 12px;
+    background: var(--sweat);
+    border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%;
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  .no.running .sweat { opacity: 1; }
+  .no.running .no-body { animation: hop .17s ease-in-out infinite; }
+  .no.running .leg.l { animation: stride .17s linear infinite alternate; }
+  .no.running .leg.r { animation: stride .17s linear infinite alternate-reverse; }
+  @keyframes stride { from { transform: rotate(-40deg); } to { transform: rotate(40deg); } }
+  @keyframes hop {
+    0%, 100% { transform: translateY(0) rotate(var(--lean)); }
+    50% { transform: translateY(-9px) rotate(var(--lean)); }
+  }
+
+  .bubble {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%) scale(.85);
+    white-space: nowrap;
+    padding: 4px 14px;
+    border-radius: 14px;
+    background: var(--chalk);
+    color: var(--bg);
+    font-family: var(--font-note);
+    font-weight: 600;
+    font-size: .9rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s, transform .15s;
+  }
+  .bubble::after {
+    content: "";
+    position: absolute;
+    top: 100%; left: 50%;
+    margin-left: -6px;
+    border: 6px solid transparent;
+    border-top-color: var(--chalk);
+  }
+  .bubble.show { opacity: 1; transform: translateX(-50%) scale(1); }
+
+  .count {
+    position: fixed;
+    left: 50%; bottom: 14px;
+    transform: translateX(-50%);
+    z-index: 30;
+    margin: 0;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    font-family: var(--font-note);
+    font-size: .85rem;
+    color: var(--chalk-dim);
+    white-space: nowrap;
+  }
+
+  .win {
+    position: fixed; inset: 0;
+    z-index: 100;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px;
+    padding-inline: 16px;
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
+    text-align: center;
+  }
+  .win h2 { margin: 0; font-weight: 400; font-size: clamp(4rem, 18vw, 9rem); color: var(--yes); line-height: 1; }
+  .win-q { margin: 0; max-width: 20em; font-size: clamp(1.2rem, 4vw, 1.8rem); color: var(--chalk); text-wrap: balance; }
+  .win-a { margin: 0; font-family: var(--font-note); color: var(--chalk-dim); }
+  .again {
+    margin-top: 10px;
+    padding: 8px 24px;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--chalk);
+    background: transparent;
+    border: 2px solid var(--chalk-dim);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .again:hover { border-color: var(--chalk); }
+  .again:focus-visible { outline: 3px solid var(--yes); outline-offset: 3px; }
+  .hearts { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .heart { position: absolute; bottom: -60px; animation: rise linear forwards; }
+  @keyframes rise {
+    0% { transform: translateY(0) rotate(-8deg); opacity: 0; }
+    10% { opacity: 1; }
+    100% { transform: translateY(-115vh) rotate(12deg); opacity: .9; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .yes { animation: none; transition: none; }
+    .no.running .no-body, .no.running .leg { animation: none; }
+    .heart { animation-duration: 0.01s !important; }
+  }
+</style>
+
+<main id="stage">
+  <div class="q-wrap">
+    <textarea id="q" rows="1" maxlength="140" spellcheck="false" aria-label="Your question" placeholder="Write your question here"></textarea>
+    <p class="hint">Tap the question to write your own</p>
+  </div>
+  <div class="answers">
+    <button id="yes" class="yes" type="button">Yes</button>
+    <span id="slot" class="slot" aria-hidden="true"></span>
+  </div>
+</main>
+
+<button id="no" class="no" type="button">
+  <span class="no-body">
+    <span class="no-pill">No</span>
+    <i class="leg l"></i><i class="leg r"></i><i class="sweat"></i>
+  </span>
+  <span id="bubble" class="bubble" aria-hidden="true"></span>
+</button>
+
+<p id="count" class="count" aria-live="polite"></p>
+
+<div id="win" class="win" hidden>
+  <div id="hearts" class="hearts"></div>
+  <h2>Yay!</h2>
+  <p id="winQ" class="win-q"></p>
+  <p class="win-a">Your answer: Yes</p>
+  <button id="again" class="again" type="button">Ask again</button>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var q = $("q"), yes = $("yes"), no = $("no"), slot = $("slot"),
+      bubble = $("bubble"), count = $("count"), win = $("win"),
+      hearts = $("hearts"), winQ = $("winQ"), again = $("again");
+  var reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DEFAULT_Q = "Will you go out with me?";
+  var lines = ["Nope!", "Can't catch me!", "Too slow!", "Hehe!", "Not today!", "Whoosh!", "Try Yes instead?", "Missed me!"];
+
+  var n = 0, moved = false, lastDodge = 0, runT = 0, bubT = 0, px = -999, py = -999;
+
+  /* question text */
+  function fit() { q.style.height = "auto"; q.style.height = q.scrollHeight + "px"; }
+  try { q.value = localStorage.getItem("catch-the-no-q") || DEFAULT_Q; } catch (e) { q.value = DEFAULT_Q; }
+  fit();
+  q.addEventListener("input", function () {
+    fit();
+    try { localStorage.setItem("catch-the-no-q", q.value); } catch (e) {}
+  });
+  q.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); q.blur(); } });
+
+  /* placement */
+  function syncSlot() {
+    var r = no.getBoundingClientRect();
+    slot.style.width = r.width + "px";
+    slot.style.height = r.height + "px";
+  }
+  function placeAtSlot() {
+    syncSlot();
+    var s = slot.getBoundingClientRect();
+    no.style.transition = "none";
+    no.style.left = s.left + "px";
+    no.style.top = s.top + "px";
+  }
+  function clampIntoView() {
+    var r = no.getBoundingClientRect();
+    var x = Math.min(Math.max(28, r.left), Math.max(28, innerWidth - r.width - 28));
+    var y = Math.min(Math.max(64, r.top), Math.max(64, innerHeight - r.height - 44));
+    no.style.transition = "none";
+    no.style.left = x + "px";
+    no.style.top = y + "px";
+  }
+  function onResize() { if (!moved) placeAtSlot(); else clampIntoView(); grow(); }
+  addEventListener("resize", onResize);
+  placeAtSlot();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fit(); if (!moved) placeAtSlot(); });
+
+  /* yes grows */
+  function grow() {
+    var maxScale = Math.max(innerWidth / yes.offsetWidth, innerHeight / yes.offsetHeight) * 1.2;
+    var s = Math.min(maxScale, 1 + n * 0.3 + n * n * 0.02);
+    yes.style.transform = n ? "scale(" + s.toFixed(3) + ")" : "";
+  }
+  function updateCount() {
+    count.textContent = n === 0 ? "Go on, try clicking No." : n === 1 ? "No ran away once." : "No ran away " + n + " times.";
+  }
+  updateCount();
+
+  /* no runs */
+  function say() {
+    bubble.textContent = lines[Math.floor(Math.random() * lines.length)];
+    bubble.classList.add("show");
+    clearTimeout(bubT);
+    bubT = setTimeout(function () { bubble.classList.remove("show"); }, 1000);
+  }
+  function dodge() {
+    var now = performance.now();
+    if (now - lastDodge < 140) return;
+    lastDodge = now;
+    var r = no.getBoundingClientRect();
+    var w = r.width, h = r.height;
+    var minX = 28, maxX = Math.max(minX, innerWidth - w - 28);
+    var minY = 64, maxY = Math.max(minY, innerHeight - h - 44);
+    var fromX = px > -900 ? px : r.left + w / 2, fromY = py > -900 ? py : r.top + h / 2;
+    var best = null, bestScore = -1e9;
+    for (var i = 0; i < 18; i++) {
+      var x = minX + Math.random() * (maxX - minX);
+      var y = minY + Math.random() * (maxY - minY);
+      var dp = Math.hypot(x + w / 2 - fromX, y + h / 2 - fromY);
+      var dc = Math.hypot(x - r.left, y - r.top);
+      var score = Math.min(dp, 450) + dc * 0.6 + Math.random() * 120 - (dp < 150 ? 1000 : 0);
+      if (score > bestScore) { bestScore = score; best = { x: x, y: y, dc: dc }; }
+    }
+    var dur = reduced ? 0 : Math.min(0.7, Math.max(0.32, best.dc / 1800 + 0.2));
+    var ease = "cubic-bezier(.4,.1,.25,1)";
+    no.style.transition = "left " + dur + "s " + ease + ", top " + dur + "s " + ease;
+    no.style.setProperty("--lean", best.x > r.left ? "14deg" : "-14deg");
+    no.style.left = best.x + "px";
+    no.style.top = best.y + "px";
+    moved = true;
+    no.classList.add("running");
+    clearTimeout(runT);
+    runT = setTimeout(function () {
+      no.classList.remove("running");
+      no.style.setProperty("--lean", "0deg");
+    }, dur * 1000 + 60);
+    n++;
+    grow();
+    updateCount();
+    say();
+  }
+  function dist(x, y) {
+    var r = no.getBoundingClientRect();
+    return Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom));
+  }
+  document.addEventListener("pointermove", function (e) {
+    px = e.clientX; py = e.clientY;
+    if (e.pointerType !== "touch" && dist(px, py) < 60) dodge();
+  });
+  document.addEventListener("pointerdown", function (e) {
+    px = e.clientX; py = e.clientY;
+    if (dist(px, py) < 110) dodge();
+  });
+  no.addEventListener("pointerenter", function (e) { px = e.clientX; py = e.clientY; dodge(); });
+  no.addEventListener("focus", dodge);
+  no.addEventListener("click", function (e) { e.preventDefault(); dodge(); });
+
+  /* yes wins */
+  var palette = ["#ff7a8a", "#ffb3c1", "#ff4d6d", "#ffd6dd"];
+  yes.addEventListener("click", function () {
+    winQ.textContent = q.value || DEFAULT_Q;
+    hearts.textContent = "";
+    for (var i = 0; i < 36; i++) {
+      var h = document.createElement("span");
+      h.className = "heart";
+      h.textContent = "♥";
+      h.style.left = Math.random() * 100 + "%";
+      h.style.fontSize = 16 + Math.random() * 30 + "px";
+      h.style.color = palette[i % palette.length];
+      h.style.animationDuration = 2.5 + Math.random() * 3 + "s";
+      h.style.animationDelay = Math.random() * 2 + "s";
+      hearts.appendChild(h);
+    }
+    win.hidden = false;
+    again.focus();
+  });
+  again.addEventListener("click", function () {
+    win.hidden = true;
+    hearts.textContent = "";
+    n = 0; moved = false;
+    grow();
+    updateCount();
+    no.classList.remove("running");
+    no.style.setProperty("--lean", "0deg");
+    placeAtSlot();
+    yes.focus({ preventScroll: true });
+  });
+})();
+</script>
+
+</body>
+</html>
